@@ -22,6 +22,7 @@
 int ldrPin = A0;
 int readValue = 0;
 
+
 /** Loop **/
 unsigned long previousMillis = 0;
 const long interval = 180000;
