@@ -117,11 +117,9 @@ void recvMsg(uint8_t *data, size_t len){
   } else if (command == "d1") {
     deleteFile(LittleFS, "/sensor.txt");
   } else if (command == "r2") {
-    readFile(LittleFS, "/button.txt");
-  } else if (command == "a2") {
-    appendFile(LittleFS, "/button.txt",(getLocalTime()+",,"+readValue+"\r\n").c_str());
+    readFile(LittleFS, "/sensor_full.txt");
   } else if (command == "d2") {
-    deleteFile(LittleFS, "/button.txt");
+    deleteFile(LittleFS, "/sensor_full.txt");
   }
   else {
     WebSerial.println("Unknown command");
@@ -176,11 +174,11 @@ void loop()
   // OTA
   ArduinoOTA.handle();
 
-  if (currentMillis - previousMillis >= interval)
-  {
-    readValue = analogRead(ldrPin);
-    appendFile(LittleFS, "/sensor.txt",(getLocalTime()+","+readValue+",\r\n").c_str());
+  // if (currentMillis - previousMillis >= interval)
+  // {
+    // readValue = analogRead(ldrPin);
+    // appendFile(LittleFS, "/sensor_full.txt",(String(millis())+","+readValue+"\r\n").c_str());
 
-    previousMillis = currentMillis;
-  }  
+  //   previousMillis = currentMillis;
+  // }  
 }
