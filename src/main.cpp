@@ -9,6 +9,7 @@
 #include <ESPAsyncWebServer.h>
 #include <WebSerial.h>
 #include <WifiCredentials.hpp>
+#include <LoopMethods.hpp>
 
 #if defined(ESP8266)
 #include <WiFiClientSecure.h>
@@ -20,12 +21,35 @@
 
 /** LDR sensor **/
 int ldrPin = A0;
-int readValue = 0;
+int ldrValue = 0;
 
 
 /** Loop **/
-unsigned long previousMillis = 0;
-const long interval = 180000;
+unsigned long previousMillis;
+const long interval = 200;
+
+int currentMethod = NONE;
+const int previousSensorValuesSize = 5;
+int previousSensorValues[previousSensorValuesSize];
+int previousValuesIndex;
+
+bool isReady = false;
+bool doorOpen = false;
+int startFrame, endFrame;
+
+/** Read previous file **/
+File file;
+int myIntegers[] = {
+  953, 952, 952, 951, 952, 952, 951, 952, 952, 953, 951, 952, 953, 951, 952, 953, 952, 952, 953, 952, 953,
+  953, 952, 953, 953, 951, 951, 952, 950, 928, 871, 814, 760, 744, 745, 766, 820, 856, 904, 928, 942, 942, 944,
+  945, 950, 949, 951, 950, 951, 950, 950, 951, 953, 950, 951, 948, 938, 922, 905, 889, 872, 856, 838, 821, 796,
+  775, 757, 740, 736, 736, 738, 738, 742, 739, 747, 756, 765, 784, 809, 832, 854, 873, 891, 913, 932, 940, 943,
+  946, 944, 948, 948, 950, 950, 950, 949, 949, 949, 951, 950, 950, 952, 952, 951, 952, 952, 952, 950
+};
+int numberOfElements = sizeof(myIntegers) / sizeof(myIntegers[0]);
+
+int currentReadIndex;
+int percentage = 10;
 
 
 /** NTP and local time **/
@@ -96,6 +120,41 @@ void deleteFile(fs::FS &fs, const char * path){
     }
 }
 
+void splitStringToInteger(const String &input, char separator, LinkedList<int> &output) {
+  int startIndex = 0;
+  int endIndex = 0;
+  while (endIndex < input.length()) {
+    if (input[endIndex] == separator) {
+      String subString = input.substring(startIndex, endIndex);
+      output.add(subString.toInt());
+      startIndex = endIndex + 1;
+    }
+    endIndex++;
+  }
+  if (startIndex < endIndex) {
+    String subString = input.substring(startIndex, endIndex);
+    output.add(subString.toInt());
+  }
+}
+
+int countOccurrences(const String &text, char target) {
+  int count = 0;
+  for (int i = 0; i < text.length(); i++) {
+    if (text[i] == target) {
+      count++;
+    }
+  }
+  return count;
+}
+
+void readPreviousFile()
+{
+    WebSerial.println("Start...");
+
+    currentMethod = READ_PREVIOUS_FILE;
+    currentReadIndex = 0;
+}
+
 
 /** WebSerial **/
 AsyncWebServer server(80);
@@ -108,20 +167,11 @@ void recvMsg(uint8_t *data, size_t len){
   WebSerial.println(">>> "+command);
 
   command.trim();
-  readValue = analogRead(ldrPin);
+  ldrValue = analogRead(ldrPin);
 
-  if (command == "r1") {
-    readFile(LittleFS, "/sensor.txt");
-  } else if (command == "a1") {
-    appendFile(LittleFS, "/sensor.txt",(getLocalTime()+","+readValue+",\r\n").c_str());
-  } else if (command == "d1") {
-    deleteFile(LittleFS, "/sensor.txt");
-  } else if (command == "r2") {
-    readFile(LittleFS, "/sensor_full.txt");
-  } else if (command == "d2") {
-    deleteFile(LittleFS, "/sensor_full.txt");
-  }
-  else {
+  if (command == "r") {
+    readPreviousFile();
+  } else {
     WebSerial.println("Unknown command");
   }
 }
@@ -167,18 +217,95 @@ void setup()
   }  
 }
 
+int getPreviousMaxValue()
+{
+  int max = 0;
+
+  for(int i = 0; i < previousSensorValuesSize; i++) {
+    if (previousSensorValues[i] > max) {
+      max = previousSensorValues[i];
+    }
+  }
+
+  return max;
+}
+
+void reset()
+{
+  currentMethod = NONE;
+  previousValuesIndex = 0;
+  currentReadIndex = 0;
+  startFrame = 0;
+  endFrame = 0;
+  doorOpen = false;
+  isReady = false;
+}
+
+void mainControl()
+{
+  if(currentMethod == READ_PREVIOUS_FILE)
+  {
+    if(isReady)
+    {
+      int previousMaxValue = getPreviousMaxValue();
+      if(myIntegers[currentReadIndex] < (previousMaxValue * ((100-percentage)*0.01)) && !doorOpen)
+      {
+        WebSerial.println("Door open on myIntegers["+String(currentReadIndex)+"] = "+String(myIntegers[currentReadIndex])+" compared with: "+String(previousMaxValue));
+        startFrame = currentReadIndex;
+        doorOpen = true;
+      }
+      
+      if(myIntegers[currentReadIndex] >= previousMaxValue * ((100-percentage)*0.01) && doorOpen)
+      {
+        endFrame = currentReadIndex;
+        WebSerial.println("Door open for "+String(endFrame-startFrame)+" frames");
+        endFrame = 0;
+        startFrame = 0;
+        doorOpen = false;
+      }
+    }
+
+    previousSensorValues[previousValuesIndex] = myIntegers[currentReadIndex];
+    previousValuesIndex = (previousValuesIndex + 1) % previousSensorValuesSize;
+    currentReadIndex++;
+
+    if (previousValuesIndex == 0)
+    {
+      isReady = true;
+    }
+
+    if(currentReadIndex >= numberOfElements)
+    {
+      reset();      
+      WebSerial.println("End");
+    }
+  }
+}
+
 void loop()
 {
   unsigned long currentMillis = millis();
 
   // OTA
-  ArduinoOTA.handle();
+  ArduinoOTA.handle(); 
 
-  // if (currentMillis - previousMillis >= interval)
+  if (currentMillis - previousMillis >= interval)
+  {
+    mainControl();    
+
+    previousMillis = currentMillis;
+  }
+
+  // // Read whole array and print it
+  // if(currentMethod == READ_PREVIOUS_FILE)
   // {
-    // readValue = analogRead(ldrPin);
-    // appendFile(LittleFS, "/sensor_full.txt",(String(millis())+","+readValue+"\r\n").c_str());
+  //   WebSerial.println("["+String(currentReadIndex)+"]  "+myIntegers[currentReadIndex]);
 
-  //   previousMillis = currentMillis;
-  // }  
+  //   currentReadIndex++;
+  //   if(currentReadIndex >= elements)
+  //   {
+  //     currentReadIndex = 0;
+  //     currentMethod = NONE;
+  //   }
+  // }
 }
