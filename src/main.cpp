@@ -7,7 +7,7 @@
 #include <LittleFS.h>
 #include "FS.h"
 #include <ESPAsyncWebServer.h>
-#include <WebSerial.h>
+// #include <//WebSerial.h>
 #include <WifiCredentials.hpp>
 #include <LoopMethods.hpp>
 
@@ -35,13 +35,13 @@ int previousValuesIndex;
 
 bool isReady = false;
 bool doorOpen = false;
-int startFrame, endFrame;
+unsigned long startFrame, endFrame;
 
 /** Read previous file **/
 File file;
 int myIntegers[] = {
   953, 952, 952, 951, 952, 952, 951, 952, 952, 953, 951, 952, 953, 951, 952, 953, 952, 952, 953, 952, 953,
-  953, 952, 953, 953, 951, 951, 952, 950, 928, 871, 814, 760, 744, 745, 766, 820, 856, 904, 928, 942, 942, 944,
+  953, 952, 953, 953, 951, 951, 952, 950, 928, 871, 760, 744, 745, 766, 820, 856, 904, 928, 942, 942, 944,
   945, 950, 949, 951, 950, 951, 950, 950, 951, 953, 950, 951, 948, 938, 922, 905, 889, 872, 856, 838, 821, 796,
   775, 757, 740, 736, 736, 738, 738, 742, 739, 747, 756, 765, 784, 809, 832, 854, 873, 891, 913, 932, 940, 943,
   946, 944, 948, 948, 950, 950, 950, 949, 949, 949, 951, 950, 950, 952, 952, 951, 952, 952, 952, 950
@@ -73,106 +73,56 @@ String getLocalTime()
   return formattedTime;
 }
 
-/** LittleFS **/
-void appendFile(fs::FS &fs, const char * path, const char * message){
-    File file = fs.open(path, "a+");
-    if(!file)
-    {
-        WebSerial.println("- failed to open file for appending");
-        return;
-    }
-    file.print(message);
-    file.close();
-}
 
-void writeFile(fs::FS &fs, const char * path, const char * message){
-    File file = fs.open(path, "w+");
-    if(!file)
-    {
-        WebSerial.println("- failed to open file for writing");
-        return;
-    }
-    file.print(message);
-    file.close();
-}
-
-void readFile(fs::FS &fs, const char * path){
-    File file = fs.open(path,"r+");
-    if(!file || file.isDirectory())
-    {
-        WebSerial.println("- failed to open file for reading");
-        return;
-    }
-
-    while(file.available())
-    {
-        WebSerial.println(file.readString());
-    }
-    file.close();
-}
-
-void deleteFile(fs::FS &fs, const char * path){
-    if(fs.remove(path))
-    {
-        WebSerial.println("- file deleted");
-    } else{
-        WebSerial.println("- delete failed");
-    }
-}
-
-void splitStringToInteger(const String &input, char separator, LinkedList<int> &output) {
-  int startIndex = 0;
-  int endIndex = 0;
-  while (endIndex < input.length()) {
-    if (input[endIndex] == separator) {
-      String subString = input.substring(startIndex, endIndex);
-      output.add(subString.toInt());
-      startIndex = endIndex + 1;
-    }
-    endIndex++;
-  }
-  if (startIndex < endIndex) {
-    String subString = input.substring(startIndex, endIndex);
-    output.add(subString.toInt());
-  }
-}
-
-int countOccurrences(const String &text, char target) {
-  int count = 0;
-  for (int i = 0; i < text.length(); i++) {
-    if (text[i] == target) {
-      count++;
-    }
-  }
-  return count;
-}
-
-void readPreviousFile()
+void reset()
 {
-    WebSerial.println("Start...");
+  currentMethod = NONE;
+  previousValuesIndex = 0;
+  currentReadIndex = 0;
+  startFrame = 0;
+  endFrame = 0;
+  doorOpen = false;
+  isReady = false;
+}
+
+void readData()
+{
+    reset();
+    //WebSerial.println("Start...");
 
     currentMethod = READ_PREVIOUS_FILE;
-    currentReadIndex = 0;
+}
+
+void printData()
+{
+    reset();
+    //WebSerial.println("Print data...");
+
+    currentMethod = PRINT_DATA;
 }
 
 
-/** WebSerial **/
-AsyncWebServer server(80);
+/** //WebSerial **/
+// AsyncWebServer server(80);
 
 void recvMsg(uint8_t *data, size_t len){
   String command = "";
   for(size_t i=0; i < len; i++){
     command += char(data[i]);
   }
-  WebSerial.println(">>> "+command);
+  //WebSerial.println(">>> "+command);
 
   command.trim();
   ldrValue = analogRead(ldrPin);
 
   if (command == "r") {
-    readPreviousFile();
+    readData();
+  } else if (command == "s") {
+    reset();
+  } else if (command == "p") {
+    printData();
   } else {
-    WebSerial.println("Unknown command");
+    //WebSerial.println("Unknown command");
   }
 }
 
@@ -206,15 +156,17 @@ void setup()
   timeClient.begin();
   timeClient.update();
 
-  // WebSerial is accessible at "<IP Address>/webserial" in browser
-  WebSerial.begin(&server);
-  WebSerial.msgCallback(recvMsg);
-  server.begin();
+  // //WebSerial is accessible at "<IP Address>///WebSerial" in browser
+  //WebSerial.begin(&server);
+  //WebSerial.msgCallback(recvMsg);
+  // server.begin();
 
   if(!LittleFS.begin()){
     Serial.println("LittleFS Mount Failed");
     return;
-  }  
+  }
+
+  readData();   
 }
 
 int getPreviousMaxValue()
@@ -230,42 +182,44 @@ int getPreviousMaxValue()
   return max;
 }
 
-void reset()
+int getValueFromArray()
 {
-  currentMethod = NONE;
-  previousValuesIndex = 0;
-  currentReadIndex = 0;
-  startFrame = 0;
-  endFrame = 0;
-  doorOpen = false;
-  isReady = false;
+  return myIntegers[currentReadIndex];
+}
+
+int getValueFromSensor()
+{
+  return analogRead(ldrPin);
 }
 
 void mainControl()
 {
   if(currentMethod == READ_PREVIOUS_FILE)
   {
+    int currentValue = getValueFromSensor();
+
     if(isReady)
     {
       int previousMaxValue = getPreviousMaxValue();
-      if(myIntegers[currentReadIndex] < (previousMaxValue * ((100-percentage)*0.01)) && !doorOpen)
+      if(currentValue < (previousMaxValue * ((100-percentage)*0.01)) && !doorOpen)
       {
-        WebSerial.println("Door open on myIntegers["+String(currentReadIndex)+"] = "+String(myIntegers[currentReadIndex])+" compared with: "+String(previousMaxValue));
-        startFrame = currentReadIndex;
+        //WebSerial.println("Door open: "+String(currentValue)+" compared with: "+String(previousMaxValue));
+        startFrame = millis();
         doorOpen = true;
       }
       
-      if(myIntegers[currentReadIndex] >= previousMaxValue * ((100-percentage)*0.01) && doorOpen)
+      if(currentValue >= previousMaxValue * ((100-percentage)*0.01) && doorOpen)
       {
-        endFrame = currentReadIndex;
-        WebSerial.println("Door open for "+String(endFrame-startFrame)+" frames");
+        endFrame = millis();
+        //WebSerial.println("Door open for "+String(endFrame-startFrame)+" millis");
         endFrame = 0;
         startFrame = 0;
         doorOpen = false;
+        bot.sendMessage(TELEGRAM_CHAT_ID, String("\xF0\x9F\x93\xAC"), ""); //📬
       }
     }
 
-    previousSensorValues[previousValuesIndex] = myIntegers[currentReadIndex];
+    previousSensorValues[previousValuesIndex] = currentValue;
     previousValuesIndex = (previousValuesIndex + 1) % previousSensorValuesSize;
     currentReadIndex++;
 
@@ -274,11 +228,16 @@ void mainControl()
       isReady = true;
     }
 
-    if(currentReadIndex >= numberOfElements)
-    {
-      reset();      
-      WebSerial.println("End");
-    }
+    // if(currentReadIndex >= numberOfElements)
+    // {
+    //   reset();      
+    //   //WebSerial.println("End");
+    // }
+  }
+
+  if(currentMethod == PRINT_DATA)
+  {
+    //WebSerial.println(getValueFromSensor());
   }
 }
 
@@ -299,7 +258,7 @@ void loop()
   // // Read whole array and print it
   // if(currentMethod == READ_PREVIOUS_FILE)
   // {
-  //   WebSerial.println("["+String(currentReadIndex)+"]  "+myIntegers[currentReadIndex]);
+  //   //WebSerial.println("["+String(currentReadIndex)+"]  "+myIntegers[currentReadIndex]);
 
   //   currentReadIndex++;
   //   if(currentReadIndex >= elements)
