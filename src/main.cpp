@@ -44,14 +44,10 @@ unsigned long startFrame, endFrame;
 int percentage = 10;
 
 /** Real example **/
-int myIntegers[] = {
-  953, 952, 952, 951, 952, 952, 951, 952, 952, 953, 951, 952, 953, 951, 952, 953, 952, 952, 953, 952, 953,
-  953, 952, 953, 953, 951, 951, 952, 950, 928, 871, 760, 744, 745, 766, 820, 856, 904, 928, 942, 942, 944,
-  945, 950, 949, 951, 950, 951, 950, 950, 951, 953, 950, 951, 948, 938, 922, 905, 889, 872, 856, 838, 821, 796,
-  775, 757, 740, 736, 736, 738, 738, 742, 739, 747, 756, 765, 784, 809, 832, 854, 873, 891, 913, 932, 940, 943,
-  946, 944, 948, 948, 950, 950, 950, 949, 949, 949, 951, 950, 950, 952, 952, 951, 952, 952, 952, 950
-};
-int numberOfElements = sizeof(myIntegers) / sizeof(myIntegers[0]);
+// int night_values[] = {1024,1024,1024,1024,1024,1024,1024,1024,1024,1024,921,893,883,877,881,992,1014,1022,1024,1024,1024,1024,900,876,870,868,864,864,861,859,840,917,998,1014,1022,1024,1024,1024,1024,1024,1024,1024,1024};
+int example_values[] = {900,900,900,903,900,900,900,900,675,484,487,859,886,893,895,896,897,897,898,481,483,810,883,892,896,897,900,900,900,480,483,482,481,481,481,481,482,481,481,469,843,886,894,897,898,897,894,888,856,763,640,555,501,476,451,446,446,449,459,464,469,473,481,481,481,483,483,483,483,483,481,483,483,484,484,484,486,484,486,483,486,481,476,471,462,449,463,507,561,622,753,884,896,897,900,900,901,902,902,902,902,901,902,902};
+// int numberOfElements_night_values = sizeof(night_values) / sizeof(night_values[0]);
+int numberOfElements_example_values = sizeof(example_values) / sizeof(example_values[0]);
 int currentReadIndex;
 
 
@@ -74,10 +70,9 @@ void reset()
   isReady = false;
 }
 
-void readData()
+void readData(String fileToRead)
 {
     reset();
-    //WebSerial.println("Start...");
 
     currentMethod = READ_PREVIOUS_FILE;
 }
@@ -105,8 +100,10 @@ void recvMsg(uint8_t *data, size_t len){
   command.trim();
   ldrValue = analogRead(ldrPin);
 
-  if (command == "r") {
-    readData();
+  if (command == "re") {
+    readData("example");
+  } else if (command == "rn") {
+    readData("night");
   } else if (command == "s") {
     reset();
   } else if (command == "p") {
@@ -157,7 +154,6 @@ void setup()
     return;
   }
 
-  readData();   
 }
 
 int getPreviousMaxValue()
@@ -173,9 +169,9 @@ int getPreviousMaxValue()
   return max;
 }
 
-int getValueFromArray()
+int getValueFromArray_example_values()
 {
-  return myIntegers[currentReadIndex];
+  return example_values[currentReadIndex];
 }
 
 int getValueFromSensor()
@@ -187,8 +183,8 @@ void mainControl()
 {
   if(currentMethod == READ_PREVIOUS_FILE)
   {
-    int currentValue = getValueFromSensor();
-
+    int currentValue = getValueFromArray_example_values();
+    WebSerial.println(String(currentValue));
     if(isReady)
     {
       int previousMaxValue = getPreviousMaxValue();
@@ -210,7 +206,7 @@ void mainControl()
         endFrame = 0;
         startFrame = 0;
         doorOpen = false;
-        bot.sendMessage(TELEGRAM_CHAT_ID, String("\xF0\x9F\x93\xAC"), ""); //📬
+        //bot.sendMessage(TELEGRAM_CHAT_ID, String("\xF0\x9F\x93\xAC"), ""); //📬
       }
     }
 
@@ -223,11 +219,11 @@ void mainControl()
       isReady = true;
     }
 
-    // if(currentReadIndex >= numberOfElements)
-    // {
-    //   reset();      
-    //   //WebSerial.println("End");
-    // }
+    if(currentReadIndex >= numberOfElements_example_values)
+    {
+      reset();      
+      //WebSerial.println("End");
+    }
   }
 
   if(currentMethod == PRINT_DATA)
