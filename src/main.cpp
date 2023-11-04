@@ -1,3 +1,5 @@
+#define WEB_DEBUG_MODE
+
 #include <Arduino.h>
 #include <ArduinoOTA.h>
 #include <UniversalTelegramBot.h>
@@ -7,7 +9,6 @@
 #include <LittleFS.h>
 #include "FS.h"
 #include <ESPAsyncWebServer.h>
-// #include <//WebSerial.h>
 #include <WifiCredentials.hpp>
 #include <LoopMethods.hpp>
 
@@ -19,6 +20,10 @@
 #include <AsyncTCP.h>
 #endif
 
+#ifdef WEB_DEBUG_MODE
+#include <WebSerial.h>
+#endif
+
 /** LDR sensor **/
 int ldrPin = A0;
 int ldrValue = 0;
@@ -28,17 +33,17 @@ int ldrValue = 0;
 unsigned long previousMillis;
 const long interval = 200;
 
+/** Main method **/
 int currentMethod = NONE;
 const int previousSensorValuesSize = 5;
 int previousSensorValues[previousSensorValuesSize];
 int previousValuesIndex;
-
 bool isReady = false;
 bool doorOpen = false;
 unsigned long startFrame, endFrame;
+int percentage = 10;
 
-/** Read previous file **/
-File file;
+/** Real example **/
 int myIntegers[] = {
   953, 952, 952, 951, 952, 952, 951, 952, 952, 953, 951, 952, 953, 951, 952, 953, 952, 952, 953, 952, 953,
   953, 952, 953, 953, 951, 951, 952, 950, 928, 871, 760, 744, 745, 766, 820, 856, 904, 928, 942, 942, 944,
@@ -47,9 +52,7 @@ int myIntegers[] = {
   946, 944, 948, 948, 950, 950, 950, 949, 949, 949, 951, 950, 950, 952, 952, 951, 952, 952, 952, 950
 };
 int numberOfElements = sizeof(myIntegers) / sizeof(myIntegers[0]);
-
 int currentReadIndex;
-int percentage = 10;
 
 
 /** NTP and local time **/
@@ -58,20 +61,6 @@ TimeChangeRule myDST = {"CEST", Last, Sun, Mar, 2, 120}; // Spain summer time (C
 TimeChangeRule mySTD = {"CET", Last, Sun, Oct, 3, 60};  // Spain winter time (Central European Time)
 Timezone myTZ(myDST, mySTD);
 NTPClient timeClient(ntpUDP, "europe.pool.ntp.org");
-
-String getLocalTime()
-{
-  // UTC time
-  time_t utcTime = timeClient.getEpochTime();
-  time_t localTime = myTZ.toLocal(utcTime);
-  int hours = hour(localTime);
-  int minutes = minute(localTime);
-  int seconds = second(localTime);
-
-  char formattedTime[9]; // 8 character plus null to finish the string
-  sprintf(formattedTime, "%02d:%02d:%02d", hours, minutes, seconds);
-  return formattedTime;
-}
 
 
 void reset()
@@ -102,15 +91,16 @@ void printData()
 }
 
 
-/** //WebSerial **/
-// AsyncWebServer server(80);
+#ifdef WEB_DEBUG_MODE
+//WebSerial **/
+AsyncWebServer server(80);
 
 void recvMsg(uint8_t *data, size_t len){
   String command = "";
   for(size_t i=0; i < len; i++){
     command += char(data[i]);
   }
-  //WebSerial.println(">>> "+command);
+  WebSerial.println(">>> "+command);
 
   command.trim();
   ldrValue = analogRead(ldrPin);
@@ -122,9 +112,10 @@ void recvMsg(uint8_t *data, size_t len){
   } else if (command == "p") {
     printData();
   } else {
-    //WebSerial.println("Unknown command");
+    WebSerial.println("Unknown command");
   }
 }
+#endif
 
 /** Telegram **/
 String botToken = TELEGRAM_TOKEN;
@@ -143,8 +134,6 @@ void setup()
     delay(5000);
     ESP.restart();
   }
-  Serial.print("Ready on ");
-  Serial.println(WiFi.localIP());
 
   // OTA
   ArduinoOTA.begin();
@@ -156,10 +145,12 @@ void setup()
   timeClient.begin();
   timeClient.update();
 
-  // //WebSerial is accessible at "<IP Address>///WebSerial" in browser
-  //WebSerial.begin(&server);
-  //WebSerial.msgCallback(recvMsg);
-  // server.begin();
+#ifdef WEB_DEBUG_MODE
+  //WebSerial is accessible at "<IP Address>///WebSerial" in browser
+  WebSerial.begin(&server);
+  WebSerial.msgCallback(recvMsg);
+  server.begin();
+#endif
 
   if(!LittleFS.begin()){
     Serial.println("LittleFS Mount Failed");
@@ -203,7 +194,9 @@ void mainControl()
       int previousMaxValue = getPreviousMaxValue();
       if(currentValue < (previousMaxValue * ((100-percentage)*0.01)) && !doorOpen)
       {
-        //WebSerial.println("Door open: "+String(currentValue)+" compared with: "+String(previousMaxValue));
+        #ifdef WEB_DEBUG_MODE
+          WebSerial.println("Door open: "+String(currentValue)+" compared with: "+String(previousMaxValue));
+        #endif
         startFrame = millis();
         doorOpen = true;
       }
@@ -211,7 +204,9 @@ void mainControl()
       if(currentValue >= previousMaxValue * ((100-percentage)*0.01) && doorOpen)
       {
         endFrame = millis();
-        //WebSerial.println("Door open for "+String(endFrame-startFrame)+" millis");
+        #ifdef WEB_DEBUG_MODE
+          WebSerial.println("Door open for "+String(endFrame-startFrame)+" millis");
+        #endif
         endFrame = 0;
         startFrame = 0;
         doorOpen = false;
@@ -237,7 +232,9 @@ void mainControl()
 
   if(currentMethod == PRINT_DATA)
   {
-    //WebSerial.println(getValueFromSensor());
+    #ifdef WEB_DEBUG_MODE
+      WebSerial.println(getValueFromSensor());
+    #endif
   }
 }
 
