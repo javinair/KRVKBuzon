@@ -47,8 +47,10 @@ int flagValue;
 /** Real example **/
 int night_values[] = {1024,1024,1024,1024,1024,1024,1024,1024,1024,1024,921,893,883,877,881,992,1014,1022,1024,1024,1024,1024,900,876,870,868,864,864,861,859,840,917,998,1014,1022,1024,1024,1024,1024,1024,1024,1024,1024};
 int example_values[] = {900,900,900,903,900,900,900,900,675,484,487,859,886,893,895,896,897,897,898,481,483,810,883,892,896,897,900,900,900,480,483,482,481,481,481,481,482,481,481,469,843,886,894,897,898,897,894,888,856,763,640,555,501,476,451,446,446,449,459,464,469,473,481,481,481,483,483,483,483,483,481,483,483,484,484,484,486,484,486,483,486,481,476,471,462,449,463,507,561,622,753,884,896,897,900,900,901,902,902,902,902,901,902,902};
+int sunny_values[] = {360,360,360,360,360,360,360,361,361,361,361,100,45,46,41,222,353,358,360,360,361,361,361,48,46,48,46,46,46,41,105,355,360,362,363,362,292,133,66,51,45,41,41,43,45,45,46,46,46,46,46,46,46,46,46,46,45,43,41,43,56,84,362,363,352,326,214,43,45,46,46,46,48,46,46,46,46,46,46,45,45,43,41,45,53,74,153,354,339,355,357,357,357,320,43,49,342,349,354,358,361,363,365,364,364,364,364,364,364,365,364};
 int numberOfElements_night_values = sizeof(night_values) / sizeof(night_values[0]);
 int numberOfElements_example_values = sizeof(example_values) / sizeof(example_values[0]);
+int numberOfElements_sunny_values = sizeof(sunny_values) / sizeof(sunny_values[0]);
 int currentReadIndex;
 
 
@@ -72,10 +74,9 @@ void reset()
   flagValue = 1024;
 }
 
-void readData(String fileToRead)
+void readData()
 {
     reset();
-
     currentMethod = READ_PREVIOUS_FILE;
 }
 
@@ -103,9 +104,11 @@ void recvMsg(uint8_t *data, size_t len){
   ldrValue = analogRead(ldrPin);
 
   if (command == "re") {
-    readData("example");
+    readData();
   } else if (command == "rn") {
-    readData("night");
+    readData();
+  } else if (command == "rs") {
+    readData();    
   } else if (command == "s") {
     reset();
   } else if (command == "p") {
@@ -181,6 +184,11 @@ int getValueFromArray_night_values()
   return night_values[currentReadIndex];
 }
 
+int getValueFromArray_sunny_values()
+{
+  return sunny_values[currentReadIndex];
+}
+
 int getValueFromSensor()
 {
   return analogRead(ldrPin);
@@ -190,7 +198,7 @@ void mainControl()
 {
   if(currentMethod == READ_PREVIOUS_FILE)
   {
-    int currentValue = getValueFromArray_night_values();
+    int currentValue = getValueFromArray_sunny_values();
     WebSerial.println(String(currentValue));
     if(isReady)
     {
@@ -227,7 +235,7 @@ void mainControl()
       isReady = true;
     }
 
-    if(currentReadIndex >= numberOfElements_night_values)
+    if(currentReadIndex >= numberOfElements_sunny_values)
     {
       reset();      
       //WebSerial.println("End");
