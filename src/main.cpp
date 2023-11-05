@@ -42,11 +42,12 @@ bool isReady = false;
 bool doorOpen = false;
 unsigned long startFrame, endFrame;
 int percentage = 10;
+int flagValue;
 
 /** Real example **/
-// int night_values[] = {1024,1024,1024,1024,1024,1024,1024,1024,1024,1024,921,893,883,877,881,992,1014,1022,1024,1024,1024,1024,900,876,870,868,864,864,861,859,840,917,998,1014,1022,1024,1024,1024,1024,1024,1024,1024,1024};
+int night_values[] = {1024,1024,1024,1024,1024,1024,1024,1024,1024,1024,921,893,883,877,881,992,1014,1022,1024,1024,1024,1024,900,876,870,868,864,864,861,859,840,917,998,1014,1022,1024,1024,1024,1024,1024,1024,1024,1024};
 int example_values[] = {900,900,900,903,900,900,900,900,675,484,487,859,886,893,895,896,897,897,898,481,483,810,883,892,896,897,900,900,900,480,483,482,481,481,481,481,482,481,481,469,843,886,894,897,898,897,894,888,856,763,640,555,501,476,451,446,446,449,459,464,469,473,481,481,481,483,483,483,483,483,481,483,483,484,484,484,486,484,486,483,486,481,476,471,462,449,463,507,561,622,753,884,896,897,900,900,901,902,902,902,902,901,902,902};
-// int numberOfElements_night_values = sizeof(night_values) / sizeof(night_values[0]);
+int numberOfElements_night_values = sizeof(night_values) / sizeof(night_values[0]);
 int numberOfElements_example_values = sizeof(example_values) / sizeof(example_values[0]);
 int currentReadIndex;
 
@@ -68,6 +69,7 @@ void reset()
   endFrame = 0;
   doorOpen = false;
   isReady = false;
+  flagValue = 1024;
 }
 
 void readData(String fileToRead)
@@ -174,6 +176,11 @@ int getValueFromArray_example_values()
   return example_values[currentReadIndex];
 }
 
+int getValueFromArray_night_values()
+{
+  return night_values[currentReadIndex];
+}
+
 int getValueFromSensor()
 {
   return analogRead(ldrPin);
@@ -183,21 +190,22 @@ void mainControl()
 {
   if(currentMethod == READ_PREVIOUS_FILE)
   {
-    int currentValue = getValueFromArray_example_values();
+    int currentValue = getValueFromArray_night_values();
     WebSerial.println(String(currentValue));
     if(isReady)
     {
       int previousMaxValue = getPreviousMaxValue();
       if(currentValue < (previousMaxValue * ((100-percentage)*0.01)) && !doorOpen)
       {
+        flagValue = previousMaxValue * ((100-percentage)*0.01);
         #ifdef WEB_DEBUG_MODE
           WebSerial.println("Door open: "+String(currentValue)+" compared with: "+String(previousMaxValue));
         #endif
         startFrame = millis();
         doorOpen = true;
       }
-      
-      if(currentValue >= previousMaxValue * ((100-percentage)*0.01) && doorOpen)
+      WebSerial.println(String(currentValue)+"   "+String(flagValue));
+      if(currentValue >= flagValue && doorOpen)
       {
         endFrame = millis();
         #ifdef WEB_DEBUG_MODE
@@ -219,7 +227,7 @@ void mainControl()
       isReady = true;
     }
 
-    if(currentReadIndex >= numberOfElements_example_values)
+    if(currentReadIndex >= numberOfElements_night_values)
     {
       reset();      
       //WebSerial.println("End");
