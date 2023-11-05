@@ -1,4 +1,4 @@
-#define WEB_DEBUG_MODE
+// #define WEB_DEBUG_MODE
 
 #include <Arduino.h>
 #include <ArduinoOTA.h>
@@ -21,7 +21,7 @@
 #endif
 
 #ifdef WEB_DEBUG_MODE
-#include <WebSerial.h>
+  #include <WebSerial.h>
 #endif
 
 /** LDR sensor **/
@@ -83,40 +83,38 @@ void readData()
 void printData()
 {
     reset();
-    //WebSerial.println("Print data...");
 
     currentMethod = PRINT_DATA;
 }
 
-
+/** WebSerial **/
 #ifdef WEB_DEBUG_MODE
-//WebSerial **/
-AsyncWebServer server(80);
+  AsyncWebServer server(80);
 
-void recvMsg(uint8_t *data, size_t len){
-  String command = "";
-  for(size_t i=0; i < len; i++){
-    command += char(data[i]);
+  void recvMsg(uint8_t *data, size_t len){
+    String command = "";
+    for(size_t i=0; i < len; i++){
+      command += char(data[i]);
+    }
+    WebSerial.println(">>> "+command);
+
+    command.trim();
+    ldrValue = analogRead(ldrPin);
+
+    if (command == "re") {
+      readData();
+    } else if (command == "rn") {
+      readData();
+    } else if (command == "rs") {
+      readData();    
+    } else if (command == "s") {
+      reset();
+    } else if (command == "p") {
+      printData();
+    } else {
+      WebSerial.println("Unknown command");
+    }
   }
-  WebSerial.println(">>> "+command);
-
-  command.trim();
-  ldrValue = analogRead(ldrPin);
-
-  if (command == "re") {
-    readData();
-  } else if (command == "rn") {
-    readData();
-  } else if (command == "rs") {
-    readData();    
-  } else if (command == "s") {
-    reset();
-  } else if (command == "p") {
-    printData();
-  } else {
-    WebSerial.println("Unknown command");
-  }
-}
 #endif
 
 /** Telegram **/
@@ -199,7 +197,9 @@ void mainControl()
   if(currentMethod == READ_PREVIOUS_FILE)
   {
     int currentValue = getValueFromArray_sunny_values();
-    WebSerial.println(String(currentValue));
+    #ifdef DEBUG_MODE
+      // WebSerial.println(String(currentValue));
+    #endif
     if(isReady)
     {
       int previousMaxValue = getPreviousMaxValue();
@@ -207,12 +207,11 @@ void mainControl()
       {
         flagValue = previousMaxValue * ((100-percentage)*0.01);
         #ifdef WEB_DEBUG_MODE
-          WebSerial.println("Door open: "+String(currentValue)+" compared with: "+String(previousMaxValue));
+          WebSerial.println("Door open with value: "+String(currentValue)+" compared with: "+String(previousMaxValue));
         #endif
         startFrame = millis();
         doorOpen = true;
       }
-      WebSerial.println(String(currentValue)+"   "+String(flagValue));
       if(currentValue >= flagValue && doorOpen)
       {
         endFrame = millis();
@@ -222,7 +221,7 @@ void mainControl()
         endFrame = 0;
         startFrame = 0;
         doorOpen = false;
-        //bot.sendMessage(TELEGRAM_CHAT_ID, String("\xF0\x9F\x93\xAC"), ""); //📬
+        bot.sendMessage(TELEGRAM_CHAT_ID, String("\xF0\x9F\x93\xAC"), ""); //📬
       }
     }
 
@@ -238,7 +237,6 @@ void mainControl()
     if(currentReadIndex >= numberOfElements_sunny_values)
     {
       reset();      
-      //WebSerial.println("End");
     }
   }
 
